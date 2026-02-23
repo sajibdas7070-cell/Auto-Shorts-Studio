@@ -1,35 +1,27 @@
-name: Real Upload Bot
+name: Research Pro Bot
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 14 * * *'
 
 jobs:
-  fix-and-run:
+  build-and-run:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v3
 
-      - name: 1. Setup Environment
+      - name: 1. Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' 
+          python-version: '3.10'
 
-      - name: 2. Fix Token Filename (ম্যাজিক ফিক্স)
-        run: |
-          # যেকোনো pickle ফাইল খুঁজে সেটাকে token.pickle নাম দেবে
-          find . -maxdepth 1 -name "*.pickle" -exec mv "{}" token.pickle \;
-          echo "ফাইল চেক করা হচ্ছে:"
-          ls -la token.pickle
-
-      - name: 3. Install Requirements
+      - name: 2. Install Research Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+          pip install --upgrade pip
           pip install requests google-generativeai google-api-python-client duckduckgo-search mutagen numpy edge-tts
 
-      - name: 4. Run Script
+      - name: 3. Run The Masterpiece
         run: python main.py
         
