@@ -1,4 +1,4 @@
-import os, sys, glob, json, time, random, asyncio, shutil
+import os, sys, glob, json, time, asyncio, shutil
 import requests
 import edge_tts
 from mutagen.mp3 import MP3
@@ -8,57 +8,51 @@ from googleapiclient.http import MediaFileUpload
 import pickle
 
 # ==========================================
-# 🔧 অটো-ফিক্সার (তোর ফাইল প্রবলেম সলভ)
+# 🔧 অটো-ফিক্সার: ফাইল নাম ঠিক করা
 # ==========================================
-print("🔧 সিস্টেম রিপেয়ার শুরু...")
+print("🔧 সিস্টেম চেক চলছে...")
 found_tokens = glob.glob("*.pickle")
 if not found_tokens:
-    print("❌ মহাবিপদ! কোনো .pickle ফাইল নেই! ফাইল আপলোড কর।")
+    print("❌ টোকেন ফাইল নেই! দয়া করে ফাইল আপলোড কর।")
     sys.exit(1)
 else:
-    # যেই নামেই থাকুক, সেটাকে token.pickle বানিয়ে নেবে
-    print(f"✅ ফাইল পাওয়া গেছে: {found_tokens[0]}")
-    shutil.move(found_tokens[0], "token.pickle")
-    print("✅ ফাইলের নাম ঠিক করা হয়েছে: token.pickle")
+    if not os.path.exists("token.pickle"):
+        shutil.move(found_tokens[0], "token.pickle")
+        print(f"✅ ফাইলের নাম ঠিক করা হয়েছে: token.pickle")
 
 # ==========================================
-# 🔐 তোর চাবি (API KEYS)
+# 🔐 API KEYS
 # ==========================================
 GEMINI_KEY = "AIzaSyD98qV_oHMMXXVm90Cd5CbddITpWXZcBng"
 PEXELS_KEY = "NsXM87PP9rOpl2kZoGh3rbY5FSZuGUURrlQxO2mC3nVjOSDBDlgWnkJF"
 
 # ==========================================
-# 🧠 রিসার্চ মডিউল: জেমিনি ভিজুয়াল ডিরেক্টর
+# 🧠 মডিউল ১: স্ক্রিপ্ট ও প্ল্যান
 # ==========================================
 def get_viral_plan():
-    print("🧠 জেমিনি এখন ভিডিও প্ল্যান করছে...")
+    print("🧠 জেমিনি ভিডিও প্ল্যান করছে...")
     try:
         genai.configure(api_key=GEMINI_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # রিসার্চ প্রম্পট: ইমোশন + ভিজুয়াল সিন
         prompt = """
-        You are a generic motivational video creator.
         Output ONLY JSON:
         {
-            "script": "One deep philosophical sentence in Hinglish about life struggle.",
-            "visual": "A specific English search term for Pexels video (e.g. 'sad man rain', 'stormy ocean')",
-            "music": "sad"
+            "script": "One deep motivational sentence in Hinglish.",
+            "visual": "A visual search term for Pexels (e.g. 'ocean storm', 'fire')",
+            "title": "Viral YouTube Shorts Title"
         }
         """
         res = model.generate_content(prompt)
-        text = res.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(text)
+        return json.loads(res.text.replace("```json", "").replace("```", "").strip())
     except:
-        return {"script": "Jab sab darwaye band ho jaye, tab naya raasta khulta hai.", "visual": "dark tunnel light", "music": "sad"}
+        return {"script": "Waqt sabka badalta hai, bas khud par yaqeen rakho.", "visual": "time clock dark", "title": "Time Changes everything 🔥 #Shorts"}
 
 # ==========================================
-# 🎙️ ভয়েস মডিউল: Edge-TTS (সবচেয়ে সেফ)
+# 🎙️ মডিউল ২: ভয়েস (Edge-TTS)
 # ==========================================
 async def generate_voice(text):
-    print(f"🎙️ ভয়েস দিচ্ছি: {text}")
+    print(f"🎙️ ভয়েস দিচ্ছি...")
     try:
-        # হিন্দি সিনেমাটিক ভয়েস (Madhur)
         communicate = edge_tts.Communicate(text, "hi-IN-MadhurNeural")
         await communicate.save("voice.mp3")
     except Exception as e:
@@ -66,17 +60,38 @@ async def generate_voice(text):
         sys.exit(1)
 
 # ==========================================
-# 🎬 প্রোডাকশন মডিউল (ভিডিও + অডিও)
+# 🎵 মডিউল ৩: অ্যান্টি-ব্লক ডাউনলোড
+# ==========================================
+def download_file(url, filename):
+    # এই হেডার থাকার কারণে ওয়েবসাইট ভাববে এটা মানুষ, রোবট না
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+    try:
+        r = requests.get(url, headers=headers, stream=True)
+        if r.status_code == 200:
+            with open(filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    f.write(chunk)
+            print(f"✅ ডাউনলোড সফল: {filename}")
+        else:
+            print(f"⚠️ ডাউনলোড ফেইল (Status {r.status_code}), ডামি ফাইল দিচ্ছি...")
+            return False
+    except Exception as e:
+        print(f"⚠️ ডাউনলোড এরর: {e}")
+        return False
+    return True
+
+# ==========================================
+# 🎬 মডিউল ৪: প্রোডাকশন
 # ==========================================
 def produce_video():
     plan = get_viral_plan()
     script = plan['script']
     print(f"📝 স্ক্রিপ্ট: {script}")
 
-    # ১. ভয়েস তৈরি
+    # ১. ভয়েস
     asyncio.run(generate_voice(script))
 
-    # ২. ভিডিও ডাউনলোড (Pexels)
+    # ২. ভিডিও (Pexels)
     print(f"⬇️ ভিডিও খুঁজছি: {plan['visual']}")
     headers = {"Authorization": PEXELS_KEY}
     url = f"https://api.pexels.com/videos/search?query={plan['visual']}&per_page=1&orientation=portrait"
@@ -86,45 +101,60 @@ def produce_video():
         data = r.json()
         if data['videos']:
             v_link = data['videos'][0]['video_files'][0]['link']
-            with open("raw.mp4", "wb") as f: f.write(requests.get(v_link).content)
+            download_file(v_link, "raw.mp4")
         else:
             raise Exception("No video")
     except:
         print("⚠️ ভিডিও পাওয়া যায়নি, ব্যাকআপ দিচ্ছি...")
-        with open("raw.mp4", "wb") as f: f.write(requests.get("https://player.vimeo.com/external/371835695.sd.mp4?s=12345").content)
+        download_file("https://player.vimeo.com/external/371835695.sd.mp4?s=12345", "raw.mp4")
 
-    # ৩. মিউজিক ডাউনলোড
+    # ৩. মিউজিক (অ্যান্টি-ব্লক সহ)
     print("🎵 মিউজিক দিচ্ছি...")
-    with open("bg.mp3", "wb") as f: f.write(requests.get("https://cdn.pixabay.com/download/audio/2022/03/09/audio_c8c8a73467.mp3").content)
+    # পিক্সাবে অনেক সময় ব্লক করে, তাই আমি গিটহাবের একটা ডিরেক্ট লিঙ্ক দিচ্ছি যেটা কখনো ব্লক হবে না
+    music_success = download_file("https://github.com/sajibdas7070-cell/Auto-Shorts-Studio/raw/main/bg_music.mp3", "bg.mp3")
+    
+    # যদি মিউজিক না নামে, তবে পিক্সাবে থেকে চেষ্টা করবে
+    if not music_success or os.path.getsize("bg.mp3") < 1000:
+         download_file("https://cdn.pixabay.com/download/audio/2022/03/09/audio_c8c8a73467.mp3", "bg.mp3")
 
-    # ৪. রিসার্চ এডিটিং (FFmpeg Magic)
-    # - Saturation 1.2 (কালার বুস্ট)
-    # - Scale & Crop (ফুল স্ক্রিন ফিক্স)
-    print("🎬 ফাইনাল রেন্ডারিং চলছে...")
+    # ৪. ফাইনাল এডিটিং (সেফ মোড)
+    print("🎬 এডিটিং চলছে...")
     try:
         audio_dur = MP3("voice.mp3").info.length
     except: audio_dur = 10
 
-    cmd = (
-        f'ffmpeg -y -stream_loop -1 -i raw.mp4 -i voice.mp3 -i bg.mp3 '
-        f'-filter_complex '
-        f'"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,eq=saturation=1.2[v];'
-        f'[2:a]volume=0.2[bg];[1:a][bg]amix=inputs=2:duration=first[a]" '
-        f'-map "[v]" -map "[a]" -c:v libx264 -preset fast -t {audio_dur} final.mp4'
-    )
+    # FFmpeg কমান্ড আপডেট করা হয়েছে যাতে মিউজিক ফেইল করলেও ক্র্যাশ না করে
+    if os.path.exists("bg.mp3") and os.path.getsize("bg.mp3") > 1000:
+        # মিউজিক সহ
+        cmd = (
+            f'ffmpeg -y -stream_loop -1 -i raw.mp4 -i voice.mp3 -i bg.mp3 '
+            f'-filter_complex '
+            f'"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[v];'
+            f'[2:a]volume=0.2[bg];[1:a][bg]amix=inputs=2:duration=first[a]" '
+            f'-map "[v]" -map "[a]" -c:v libx264 -preset fast -t {audio_dur} final.mp4'
+        )
+    else:
+        # মিউজিক ছাড়া (সেফটি)
+        print("⚠️ মিউজিক ফাইল নষ্ট, শুধু ভয়েস দিয়ে ভিডিও বানাচ্ছি...")
+        cmd = (
+            f'ffmpeg -y -stream_loop -1 -i raw.mp4 -i voice.mp3 '
+            f'-filter_complex '
+            f'"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[v]" '
+            f'-map "[v]" -map 1:a -c:v libx264 -preset fast -t {audio_dur} final.mp4'
+        )
+    
     os.system(cmd)
 
 # ==========================================
 # 🚀 আপলোড মডিউল
 # ==========================================
 def upload_now():
-    print("🚀 আপলোড শুরু...")
     if not os.path.exists("final.mp4"):
-        print("❌ ভিডিও তৈরি হয়নি! FFmpeg ফেল করেছে।")
+        print("❌ ভিডিও রেন্ডার ফেইল করেছে!")
         sys.exit(1)
-
+        
+    print("🚀 আপলোড শুরু...")
     try:
-        # ফাইল নাম ফিক্স করার পর 'token.pickle' নামেই লোড হবে
         with open("token.pickle", "rb") as token:
             creds = pickle.load(token)
         
@@ -134,7 +164,7 @@ def upload_now():
             body={
                 "snippet": {
                     "title": "Deep Reality 🌑 #Shorts #Motivation",
-                    "description": "Motivational video generated by AI.",
+                    "description": "Generated by AI Studio.",
                     "categoryId": "27"
                 },
                 "status": {"privacyStatus": "public"}
@@ -142,7 +172,7 @@ def upload_now():
             media_body=MediaFileUpload("final.mp4", chunksize=-1, resumable=True)
         )
         res = request.execute()
-        print(f"🎉 সাকসেস! ভিডিও আপলোড হয়েছে: https://youtu.be/{res['id']}")
+        print(f"🎉 সাকসেস! ভিডিও আপলোড হয়েছে। ID: {res['id']}")
     except Exception as e:
         print(f"❌ আপলোড এরর: {e}")
         sys.exit(1)
