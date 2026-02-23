@@ -1,0 +1,13 @@
+name: AutoBot
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 14 * * *' # প্রতিদিন বাংলাদেশ সময় রাত ৮টায় অটো চলবে
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run
+        run: python main.py
+
