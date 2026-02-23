@@ -1,29 +1,28 @@
-name: Ultimate Research Bot
+name: Zero Error Bot
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 14 * * *' # প্রতিদিন রাত ৮টায় অটো চলবে
 
 jobs:
-  research-grade-production:
+  run-fail-safe:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v3
 
-      - name: 1. Setup High-Performance Environment
+      - name: 1. Setup Python 3.11 (Latest)
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10' 
+          python-version: '3.11' 
 
-      - name: 2. Install Cinematic Tools
+      - name: 2. Install Tools & Backup Voice
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libavcodec-extra
+          sudo apt-get install -y ffmpeg
           pip install --upgrade pip
-          pip install requests google-generativeai google-api-python-client duckduckgo-search mutagen numpy pillow
+          # Edge-TTS হলো ইলেভেন ল্যাবসের সেরা ফ্রি বিকল্প
+          pip install requests google-generativeai google-api-python-client duckduckgo-search mutagen numpy edge-tts asyncio
 
-      - name: 3. Run The Research Engine
+      - name: 3. Run The Engine
         run: python main.py
         
