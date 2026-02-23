@@ -1,27 +1,23 @@
-name: Research Pro Bot
+name: 365 Days Viral Factory
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 14 * * *'
+    - cron: '0 0,2,4,6,8,10,12,14,16,18 * * *' # প্রতিদিন ১০ বার অটো রান
 
 jobs:
-  build-and-run:
+  production:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: 1. Setup Python
+      - uses: actions/checkout@v4
+      - name: Setup Python 3.11
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
-
-      - name: 2. Install Research Tools
+          python-version: '3.11'
+      - name: Install System Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install --upgrade pip
-          pip install requests google-generativeai google-api-python-client duckduckgo-search mutagen numpy edge-tts
-
-      - name: 3. Run The Masterpiece
+          pip install requests google-generativeai google-api-python-client mutagen edge-tts
+      - name: Run Master Engine
         run: python main.py
         
