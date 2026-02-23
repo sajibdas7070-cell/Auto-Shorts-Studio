@@ -1,187 +1,118 @@
-import os, sys, glob, json, time, asyncio, shutil, random
-import requests
-import edge_tts
+import os, sys, glob, json, time, asyncio, shutil, random, subprocess, pickle
+import requests, edge_tts
 from mutagen.mp3 import MP3
 import google.generativeai as genai
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-import pickle
 
 # ==========================================
-# 🔧 অটো-ফিক্সার
+# 🛠️ রিসার্চ মডিউল ১: জিরো-এরর ফিক্সার
 # ==========================================
-print("🔧 সিস্টেম রেডি হচ্ছে...")
-found_tokens = glob.glob("*.pickle")
-if found_tokens and not os.path.exists("token.pickle"):
-    shutil.move(found_tokens[0], "token.pickle")
+def init_system():
+    print("🔧 সিস্টেম ডায়াগনস্টিক...")
+    # টোকেন ফাইল অটো-রিনেম (রিসার্চ ৩ অনুযায়ী)
+    found = glob.glob("*.pickle")
+    if found and not os.path.exists("token.pickle"):
+        shutil.move(found[0], "token.pickle")
+        print(f"✅ টোকেন ডিটেক্টেড: {found[0]}")
+    if not os.path.exists("token.pickle"):
+        print("❌ টোকেন ফাইল নেই!"); sys.exit(1)
 
-if not os.path.exists("token.pickle"):
-    print("❌ টোকেন ফাইল নেই! আপলোড হবে না।")
-    sys.exit(1)
-
-# ==========================================
-# 🔐 API KEYS
-# ==========================================
+# API KEYS
 GEMINI_KEY = "AIzaSyD98qV_oHMMXXVm90Cd5CbddITpWXZcBng"
 PEXELS_KEY = "NsXM87PP9rOpl2kZoGh3rbY5FSZuGUURrlQxO2mC3nVjOSDBDlgWnkJF"
 
 # ==========================================
-# 🧠 মডিউল ১: ভাইরাল অ্যাটিটিউড ব্রেইন
+# 🧠 রিসার্চ মডিউল ২: ভাইরাল টপিক জেনারেটর
 # ==========================================
-def get_viral_content(index):
-    print(f"🧠 ভিডিও {index+1}: জেমিনি ভাইরাল টপিক খুঁজছে...")
+def get_viral_content():
+    print("🧠 জেমিনি ভাইরাল রিসার্চ করছে...")
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # রিসার্চ ২ অনুযায়ী: ৬০ সেকেন্ডের ইমোশনাল অ্যাটিটিউড স্ক্রিপ্ট
+    prompt = """
+    Create a viral 60-second YouTube Short script. 
+    Topic: Sigma Attitude / Dark Psychology / Success.
+    Language: Hinglish (Hindi + English mix).
+    Style: Emotional, Deep, Attitude.
+    Output ONLY JSON:
+    {"script": "Full script here...", "visual": "search keyword for pexels", "title": "Viral Title", "tags": "#attitude #sigma"}
+    """
     try:
-        genai.configure(api_key=GEMINI_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # এখানে অ্যাটিটিউড এবং ইমোশন মিক্স করা হয়েছে
-        topics = ["Sigma Rule", "Fake Friends", "Success Revenge", "Dark Psychology", "Lone Wolf", "Mother's Love", "Broken Heart"]
-        topic = random.choice(topics)
-        
-        prompt = f"""
-        Act as a Viral Content Creator. Create a script for a YouTube Short about '{topic}'.
-        Style: High Attitude, Deep Emotion, Killer Mindset.
-        Language: Hinglish (mix of Hindi & English).
-        Length: Must be around 140-150 words (to cover 55-60 seconds).
-        
-        Output ONLY JSON:
-        {{
-            "script": "The spoken text here...",
-            "visual_keywords": ["keyword1", "keyword2", "keyword3"],
-            "title": "A viral clickbait title with emojis",
-            "tags": "#tag1 #tag2 #tag3"
-        }}
-        """
         res = model.generate_content(prompt)
         return json.loads(res.text.replace("```json", "").replace("```", "").strip())
     except:
-        return {
-            "script": "Jab waqt bura hota hai na, tab gair to kya, apne bhi rang dikhate hain. Lekin yaad rakhna, sher akela hi shikar karta hai.",
-            "visual_keywords": ["lion walking", "sad man rain", "fire"],
-            "title": "Time Changes Everything 🔥 #Attitude #Shorts",
-            "tags": "#sigma #motivation #viral"
-        }
+        return {"script": "Jab tum akele chalna sikh jaate ho, tab tum asli power mehsoos karte ho.", "visual": "dark city lone man", "title": "Power of Silence 🌑", "tags": "#sigma #shorts"}
 
 # ==========================================
-# 🎙️ মডিউল ২: ভয়েস (ইমোশনাল টিউন)
+# 🎙️ রিসার্চ মডিউল ৩: ডিপ ভয়েস ইঞ্জিন
 # ==========================================
-async def generate_voice(text, filename):
-    try:
-        # ভয়েস পিচ এবং স্পিড একটু স্লো করা হয়েছে যাতে 'Heavy Attitude' লাগে
-        communicate = edge_tts.Communicate(text, "hi-IN-MadhurNeural", rate="-5%", pitch="-2Hz")
-        await communicate.save(filename)
-    except:
-        pass
+async def generate_voice(text):
+    # রিসার্চ ৪ অনুযায়ী: গম্ভীর এবং ইমোশনাল ভয়েস
+    voice_file = "voice.mp3"
+    communicate = edge_tts.Communicate(text, "hi-IN-MadhurNeural", rate="-5%", pitch="-3Hz")
+    await communicate.save(voice_file)
+    return voice_file
 
 # ==========================================
-# 🎬 মডিউল ৩: ক্রিয়েটিভ এডিটিং (৩টি ক্লিপ)
+# 🎬 রিসার্চ মডিউল ৪: সিনেমাটিক রেন্ডারিং (FFmpeg)
 # ==========================================
-def download_clip(query, filename):
+def produce_cinematic_video(data):
+    print("🎬 সিনেমাটিক রেন্ডারিং শুরু...")
+    
+    # ১. অডিও দৈর্ঘ্য
+    audio_dur = MP3("voice.mp3").info.length
+
+    # ২. ভিডিও সোর্সিং (Pexels)
     headers = {"Authorization": PEXELS_KEY}
-    url = f"https://api.pexels.com/videos/search?query={query}&per_page=1&orientation=portrait&size=medium"
-    try:
-        r = requests.get(url, headers=headers)
-        v_link = r.json()['videos'][0]['video_files'][0]['link']
-        with open(filename, "wb") as f: f.write(requests.get(v_link).content)
-        return True
-    except:
-        return False
+    v_search = requests.get(f"https://api.pexels.com/videos/search?query={data['visual']}&per_page=1&orientation=portrait", headers=headers).json()
+    v_url = v_search['videos'][0]['video_files'][0]['link']
+    with open("raw.mp4", "wb") as f: f.write(requests.get(v_url).content)
 
-def produce_video(index):
-    data = get_viral_content(index)
-    script = data['script']
-    print(f"📝 স্ক্রিপ্ট সাইজ: {len(script.split())} শব্দ")
+    # ৩. মিউজিক (Ducking Effect)
+    music_url = "https://cdn.pixabay.com/download/audio/2022/03/09/audio_c8c8a73467.mp3"
+    with open("bg.mp3", "wb") as f: f.write(requests.get(music_url).content)
 
-    # ১. ভয়েস
-    asyncio.run(generate_voice(script, "voice.mp3"))
-
-    # ২. মাল্টি-ক্লিপ ডাউনলোড (৩টি আলাদা সিন)
-    print("⬇️ সিন ডাউনলোড করছি...")
-    clips = []
-    for i, keyword in enumerate(data['visual_keywords'][:3]):
-        clip_name = f"clip_{i}.mp4"
-        if download_clip(keyword, clip_name):
-            clips.append(clip_name)
-    
-    if not clips:
-        # ব্যাকআপ ভিডিও
-        download_clip("dark aesthetic", "clip_0.mp4")
-        clips.append("clip_0.mp4")
-
-    # ৩. মিউজিক
-    with open("bg.mp3", "wb") as f: f.write(requests.get("https://cdn.pixabay.com/download/audio/2022/03/09/audio_c8c8a73467.mp3").content)
-
-    # ৪. FFmpeg ম্যাজিক এডিটিং (Join Clips + Resize)
-    print("🎬 ভিডিও এডিটিং চলছে...")
-    
-    # সব ক্লিপকে ১০৮০x১৯২০ সাইজে কনভার্ট করা হবে
-    filter_complex = ""
-    inputs = ""
-    for i, clip in enumerate(clips):
-        inputs += f"-i {clip} "
-        filter_complex += f"[{i}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[v{i}];"
-    
-    concat_part = "".join([f"[v{i}]" for i in range(len(clips))])
-    
-    # সব জোড়া লাগিয়ে ফাইনাল ভিডিও
+    # ৪. রিসার্চ ৫: হাই-প্রোফাইল FFmpeg (Blur Padding + Sidechain Compression)
+    # এই কমান্ডটি ভিডিওর পেছনের কালো অংশ ব্লার করে দেবে এবং কথা শুরু হলে মিউজিক কমিয়ে দেবে
     cmd = (
-        f'ffmpeg -y {inputs} -i voice.mp3 -i bg.mp3 '
+        f'ffmpeg -y -stream_loop -1 -i raw.mp4 -i voice.mp3 -i bg.mp3 '
         f'-filter_complex '
-        f'"{filter_complex}{concat_part}concat=n={len(clips)}:v=1:a=0[v];'
-        f'[2+n:a]volume=0.2[bg];[{1+n}:a][bg]amix=inputs=2:duration=first[a]" '
-        f'-map "[v]" -map "[a]" -c:v libx264 -preset fast -shortest final.mp4'
+        f'"[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[fg];'
+        f'[0:v]scale=1080:1920,boxblur=20:10[bg_blur];[bg_blur][fg]overlay=(W-w)/2:(H-h)/2[v];'
+        f'[2:a]volume=0.2[music];[music][1:a]sidechaincompress=threshold=0.1:ratio=20:attack=50:release=200[a]" '
+        f'-map "[v]" -map "[a]" -c:v libx264 -t {audio_dur} final.mp4'
     )
-    # জটিল কমান্ড যদি ফেইল করে, সিম্পল ১টা ভিডিও দিয়ে ব্যাকআপ
-    if os.system(cmd) != 0:
-        print("⚠️ মাল্টি-ক্লিপ এডিটিং ফেইল, সিঙ্গেল ক্লিপ ব্যবহার করছি...")
-        os.system(f'ffmpeg -y -stream_loop -1 -i clip_0.mp4 -i voice.mp3 -i bg.mp3 -filter_complex "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[v];[2:a]volume=0.2[bg];[1:a][bg]amix=inputs=2:duration=first[a]" -map "[v]" -map "[a]" -c:v libx264 -shortest final.mp4')
-
-    return data # টাইটেল ও ট্যাগ রিটার্ন করবে
+    subprocess.run(cmd, shell=True)
 
 # ==========================================
-# 🚀 লুপ আপলোড সিস্টেম (১০টি ভিডিও)
+# 🚀 রিসার্চ মডিউল ৫: অটো-আপলোড
 # ==========================================
-def start_marathon():
-    # ১০ বার লুপ চলবে
-    for i in range(10): 
-        print(f"\n🎥 ভিডিও প্রসেসিং {i+1}/10 শুরু...")
-        try:
-            video_data = produce_video(i)
-            
-            # আপলোড
-            print("🚀 আপলোড হচ্ছে...")
-            with open("token.pickle", "rb") as token: creds = pickle.load(token)
-            youtube = build("youtube", "v3", credentials=creds)
-            
-            request = youtube.videos().insert(
-                part="snippet,status",
-                body={
-                    "snippet": {
-                        "title": video_data['title'],
-                        "description": f"{video_data['script']}\n\n{video_data['tags']}",
-                        "categoryId": "27"
-                    },
-                    "status": {"privacyStatus": "public"}
-                },
-                media_body=MediaFileUpload("final.mp4", chunksize=-1, resumable=True)
-            )
-            res = request.execute()
-            print(f"✅ ভিডিও {i+1} সাকসেস! Link: https://youtu.be/{res['id']}")
-            
-            # ক্লিনআপ
-            for f in glob.glob("*.mp4") + glob.glob("*.mp3"):
-                try: os.remove(f)
-                except: pass
-            
-            # ১০ মিনিট বিশ্রাম (যাতে স্প্যাম না ধরে)
-            if i < 9:
-                print("⏳ ১০ মিনিটের বিরতি... (Spam Protection)")
-                time.sleep(600) 
+def upload_to_youtube(data):
+    print("🚀 ইউটিউবে আপলোড হচ্ছে...")
+    with open("token.pickle", "rb") as t: creds = pickle.load(t)
+    youtube = build("youtube", "v3", credentials=creds)
+    
+    request = youtube.videos().insert(
+        part="snippet,status",
+        body={
+            "snippet": {"title": data['title'], "description": data['script'] + "\n" + data['tags'], "categoryId": "27"},
+            "status": {"privacyStatus": "public"}
+        },
+        media_body=MediaFileUpload("final.mp4", chunksize=-1, resumable=True)
+    )
+    res = request.execute()
+    print(f"✅ ভিডিও লাইভ! ID: {res['id']}")
 
-        except Exception as e:
-            print(f"❌ ভিডিও {i+1} এরর: {e}")
-            time.sleep(60) # ১ মিনিট পর আবার চেষ্টা করবে
-
+# ==========================================
+# ⚡ এক্সিকিউশন
+# ==========================================
 if __name__ == "__main__":
-    start_marathon()
-                
+    init_system()
+    content = get_viral_content()
+    asyncio.run(generate_voice(content['script']))
+    produce_cinematic_video(content)
+    upload_to_youtube(content)
+    print("🌟 আজকের কাজ সফলভাবে সম্পন্ন!")
+    
