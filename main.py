@@ -1,100 +1,115 @@
-import os, random, subprocess, json, asyncio, pickle, time, sys
-import google.generativeai as genai
+import os, random, subprocess, sys, pickle, time
+from googlesearch import search
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# কনফিগারেশন
-GEMINI_KEY = os.getenv("GEMINI_KEY")
+# --- ১. ফাইল চেক (তোমার ঠিক করা নামের জন্য) ---
+TOKEN_FILE = "token.pickle"
 
-# ১. ভাইরাল মুভি খোঁজা (Bot Detection Bypass সহ)
-def search_viral_content():
+if not os.path.exists(TOKEN_FILE):
+    print(f"❌ এরর: '{TOKEN_FILE}' ফাইলটি পাওয়া যাচ্ছে না!")
+    sys.exit(1)
+
+print(f"✅ ফাইল লোড হয়েছে: {TOKEN_FILE}")
+
+# --- ২. সেফ ভিডিও খোঁজা (ব্লক বাইপাস সিস্টেম) ---
+def find_video_via_google():
+    print("🔍 ভিডিও খোঁজা হচ্ছে (Google Method)...")
     queries = [
-        "best russian action movie scenes 2025",
-        "viral polish thriller movie clips",
-        "sci-fi short film award winning full"
+        "site:youtube.com viral russian movie trailer 2024",
+        "site:youtube.com best polish thriller movie clip",
+        "site:youtube.com chinese sci-fi movie scenes viral"
     ]
     query = random.choice(queries)
-    print(f"🔍 Searching for: {query}")
-    
-    # এই কমান্ডটি ইউটিউবকে ধোঁকা দেবে যে এটি একটি সাধারণ ব্রাউজার
-    cmd = [
-        'yt-dlp', 
-        f'ytsearch5:{query}', 
-        '--get-id', '--get-title',
-        '--match-filter', 'duration > 600',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    ]
     
     try:
-        output = subprocess.check_output(cmd).decode().strip().split('\n')
-        if not output: return None
+        # ইউটিউব সার্চ না করে গুগল থেকে লিংক নেওয়া হচ্ছে (ব্লক হবে না)
+        links = list(search(query, num_results=10, lang="en"))
         
-        # র্যান্ডম একটি ভিডিও সিলেক্ট করা
-        idx = random.randrange(0, len(output)-1, 2)
-        return {"title": output[idx], "url": f"https://youtube.com/watch?v={output[idx+1]}"}
+        # ফিল্টার: শুধু ইউটিউব ভিডিও লিংক নেওয়া
+        youtube_links = [link for link in links if "watch?v=" in link]
+        
+        if not youtube_links:
+            print("⚠️ কোনো ভিডিও পাওয়া যায়নি।")
+            return None
+            
+        video_url = random.choice(youtube_links)
+        print(f"🎯 টার্গেট ভিডিও: {video_url}")
+        
+        # ভিডিওর টাইটেল বের করা
+        cmd = f'yt-dlp --get-title "{video_url}" --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"'
+        title = subprocess.check_output(cmd, shell=True).decode().strip()
+        return {"title": title, "url": video_url}
+        
     except Exception as e:
-        print(f"❌ Search Error: {e}")
+        print(f"❌ সার্চ এরর: {e}")
         return None
 
-# ২. ভিডিও ডাউনলোড ও প্রসেসিং
-def process_video(data):
-    print(f"⬇️ Downloading: {data['title']}")
-    # ডাউনলোড কমান্ড (কুকিজ ছাড়া যাতে কাজ করে)
+# --- ৩. ডাউনলোড ও এডিটিং ---
+def process_video(video_data):
+    print(f"⬇️ ডাউনলোড হচ্ছে: {video_data['title']}")
+    
+    # স্পেশাল কমান্ড: ইউটিউবকে মোবাইল ফোন হিসেবে পরিচয় দেওয়া (Android Client)
     cmd = [
-        'yt-dlp', '-f', 'bestvideo[height<=720]+bestaudio/best', 
+        'yt-dlp', 
+        '-f', 'bestvideo[height<=720]+bestaudio/best', 
         '-o', 'raw.mp4', 
-        '--no-check-certificate', 
-        '--geo-bypass',
-        data['url']
+        '--no-check-certificate',
+        '--extractor-args', 'youtube:player_client=android', # মোবাইল ট্রিক
+        '--user-agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
+        video_data['url']
     ]
-    subprocess.run(cmd)
+    
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        print("❌ ডাউনলোড ফেইল করেছে! অন্য ভিডিও ট্রাই করা উচিত।")
+        sys.exit(1)
 
-    # ৩. এডিটিং (কপিরাইট বাইপাস)
-    print("🎬 Editing video...")
+    print("🎬 এডিটিং চলছে...")
+    # মিরর + জুম (কপিরাইট বাইপাস)
     edit_cmd = [
         'ffmpeg', '-y', '-i', 'raw.mp4',
-        '-vf', "hflip,scale=1280:720,eq=brightness=0.05:contrast=1.2",
+        '-vf', "hflip,scale=1280:720,eq=brightness=0.05:contrast=1.1,zoompan=z='min(zoom+0.001,1.1)':d=1:s=1280x720",
         '-af', "asetrate=44100*0.98,atempo=1.02",
-        '-t', '600', 'final.mp4'
+        '-t', '59', 'final.mp4'
     ]
     subprocess.run(edit_cmd)
 
-# ৪. ইউটিউবে আপলোড
-def upload_to_youtube(title):
-    print("🚀 Uploading to YouTube...")
-    if not os.path.exists("token.pickle"):
-        print("❌ Error: token.pickle not found! Rename 'token (3).pickle' to 'token.pickle'")
-        return
-
-    with open("token.pickle", "rb") as token:
-        creds = pickle.load(token)
-    
-    youtube = build("youtube", "v3", credentials=creds)
-    body = {
-        "snippet": {
-            "title": f"{title} - Hindi Explained",
-            "description": "Viral movie explained in Hindi. #shorts #movie #explanation",
-            "categoryId": "24"
-        },
-        "status": {"privacyStatus": "public"}
-    }
-    
+# --- ৪. আপলোড ---
+def upload_video(title):
+    print("🚀 আপলোড হচ্ছে...")
     try:
+        with open(TOKEN_FILE, "rb") as token:
+            creds = pickle.load(token)
+        
+        youtube = build("youtube", "v3", credentials=creds)
+        
+        body = {
+            "snippet": {
+                "title": f"{title[:50]}... - Movie Explained 🎬 #shorts",
+                "description": "Viral movie clip explained. #shorts #viral #movie",
+                "categoryId": "24"
+            },
+            "status": {"privacyStatus": "public"}
+        }
+        
         youtube.videos().insert(
             part="snippet,status",
             body=body,
             media_body=MediaFileUpload("final.mp4", resumable=True)
         ).execute()
-        print("✅ Upload Successful!")
+        print("💎 ভিডিও সাকসেসফুলি পোস্ট হয়েছে!")
+        
     except Exception as e:
-        print(f"❌ Upload Failed: {e}")
+        print(f"❌ আপলোড এরর: {e}")
+        sys.exit(1)
 
-# মেইন ফাংশন
 if __name__ == "__main__":
-    video = search_viral_content()
+    video = find_video_via_google()
     if video:
         process_video(video)
-        upload_to_youtube(video['title'])
+        upload_video(video['title'])
     else:
-        print("⚠️ No video found today.")
+        print("ভিডিও পাওয়া যায়নি, আবার চেষ্টা করো।")
+        sys.exit(1)
         
