@@ -1,17 +1,23 @@
-name: Auto Post
+name: Auto Shorts Studio
 on:
   schedule:
     - cron: '0 */4 * * *' # প্রতি ৪ ঘণ্টা পর পর চলবে
-  workflow_dispatch:
+  workflow_dispatch:      # ম্যানুয়ালি রান করার বাটন
+
 jobs:
-  post:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: pip install yt-dlp google-generativeai google-api-python-client
-      - run: sudo apt install ffmpeg
-      - env:
+      
+      - name: Update Server & Install Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg
+          pip install yt-dlp google-generativeai google-api-python-client
+
+      - name: Run Automation
+        env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-          PICKLE_CONTENT: ${{ secrets.PICKLE_CONTENT }}
         run: python main.py
         
