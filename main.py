@@ -1,63 +1,100 @@
-import os, random, subprocess, json, asyncio, base64, pickle, time
+import os, random, subprocess, json, asyncio, pickle, time, sys
 import google.generativeai as genai
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# ১. সেটিংস (গিটহাব সিক্রেটস থেকে অটোমেটিক নেবে)
+# কনফিগারেশন
 GEMINI_KEY = os.getenv("GEMINI_KEY")
-PICKLE_CONTENT = os.getenv("PICKLE_CONTENT") # token.pickle এর কোড
 
-# ২. ভাইরাল মুভি রিসার্চার (রাশিয়া/পোল্যান্ড ফোকাস)
+# ১. ভাইরাল মুভি খোঁজা (Bot Detection Bypass সহ)
 def search_viral_content():
     queries = [
-        "top russian action movie trailers 2026",
-        "popular polish web series clips trending",
-        "viral european sci-fi movie scenes"
+        "best russian action movie scenes 2025",
+        "viral polish thriller movie clips",
+        "sci-fi short film award winning full"
     ]
-    q = random.choice(queries)
-    # ১০টি রেজাল্ট থেকে একটি র্যান্ডম ভিডিও বেছে নেবে
-    cmd = f'yt-dlp "ytsearch10:{q}" --get-id --get-title --match-filter "duration > 600"'
-    res = subprocess.check_output(cmd, shell=True).decode().split('\n')
-    idx = random.randrange(0, len(res)-1, 2)
-    return {"title": res[idx], "url": f"https://youtube.com/watch?v={res[idx+1]}"}
-
-# ৩. কপিরাইট ইভেশন এডিটর (Advanced FFmpeg)
-def smart_edit(input_f, output_f):
-    # ভিডিও ফ্লিপ, জুম এবং অডিও পিচ পরিবর্তন করবে যাতে স্ট্রাইক না আসে
+    query = random.choice(queries)
+    print(f"🔍 Searching for: {query}")
+    
+    # এই কমান্ডটি ইউটিউবকে ধোঁকা দেবে যে এটি একটি সাধারণ ব্রাউজার
     cmd = [
-        'ffmpeg', '-y', '-i', input_f,
-        '-vf', "hflip,scale=1280:720,eq=brightness=0.05:contrast=1.3,zoompan=z='min(zoom+0.001,1.1)':d=1:s=1280x720",
-        '-af', "asetrate=44100*0.97,atempo=1.03",
-        '-t', '900', output_f # প্রথম ১৫ মিনিট প্রসেস করবে
+        'yt-dlp', 
+        f'ytsearch5:{query}', 
+        '--get-id', '--get-title',
+        '--match-filter', 'duration > 600',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    ]
+    
+    try:
+        output = subprocess.check_output(cmd).decode().strip().split('\n')
+        if not output: return None
+        
+        # র্যান্ডম একটি ভিডিও সিলেক্ট করা
+        idx = random.randrange(0, len(output)-1, 2)
+        return {"title": output[idx], "url": f"https://youtube.com/watch?v={output[idx+1]}"}
+    except Exception as e:
+        print(f"❌ Search Error: {e}")
+        return None
+
+# ২. ভিডিও ডাউনলোড ও প্রসেসিং
+def process_video(data):
+    print(f"⬇️ Downloading: {data['title']}")
+    # ডাউনলোড কমান্ড (কুকিজ ছাড়া যাতে কাজ করে)
+    cmd = [
+        'yt-dlp', '-f', 'bestvideo[height<=720]+bestaudio/best', 
+        '-o', 'raw.mp4', 
+        '--no-check-certificate', 
+        '--geo-bypass',
+        data['url']
     ]
     subprocess.run(cmd)
 
-# ৪. এআই হিন্দি ডাবিং স্ক্রিপ্ট ও টাইটেল
-def get_hindi_metadata(title):
-    genai.configure(api_key=GEMINI_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    prompt = f"Movie: {title}. Create a viral Hindi Clickbait Title and Tags for YouTube. Format: JSON"
-    res = model.generate_content(prompt)
-    return json.loads(res.text.replace("```json", "").replace("```", ""))
+    # ৩. এডিটিং (কপিরাইট বাইপাস)
+    print("🎬 Editing video...")
+    edit_cmd = [
+        'ffmpeg', '-y', '-i', 'raw.mp4',
+        '-vf', "hflip,scale=1280:720,eq=brightness=0.05:contrast=1.2",
+        '-af', "asetrate=44100*0.98,atempo=1.02",
+        '-t', '600', 'final.mp4'
+    ]
+    subprocess.run(edit_cmd)
 
-# ৫. ইউটিউব আপলোডার
-def upload_to_yt(file, meta):
-    creds = pickle.loads(base64.b64decode(PICKLE_CONTENT))
+# ৪. ইউটিউবে আপলোড
+def upload_to_youtube(title):
+    print("🚀 Uploading to YouTube...")
+    if not os.path.exists("token.pickle"):
+        print("❌ Error: token.pickle not found! Rename 'token (3).pickle' to 'token.pickle'")
+        return
+
+    with open("token.pickle", "rb") as token:
+        creds = pickle.load(token)
+    
     youtube = build("youtube", "v3", credentials=creds)
     body = {
-        "snippet": {"title": meta['title'], "description": "Viral Movie Summary in Hindi #trending", "categoryId": "24"},
+        "snippet": {
+            "title": f"{title} - Hindi Explained",
+            "description": "Viral movie explained in Hindi. #shorts #movie #explanation",
+            "categoryId": "24"
+        },
         "status": {"privacyStatus": "public"}
     }
-    youtube.videos().insert(part="snippet,status", body=body, media_body=MediaFileUpload(file, resumable=True)).execute()
-
-async def start():
-    data = search_viral_content()
-    print(f"🎯 Working on: {data['title']}")
-    subprocess.run(['yt-dlp', '-f', 'bestvideo[height<=720]+bestaudio/best', '-o', 'raw.mp4', data['url']])
-    meta = get_hindi_metadata(data['title'])
-    smart_edit("raw.mp4", "final.mp4")
-    upload_to_yt("final.mp4", meta)
-
-if __name__ == "__main__":
-    asyncio.run(start())
     
+    try:
+        youtube.videos().insert(
+            part="snippet,status",
+            body=body,
+            media_body=MediaFileUpload("final.mp4", resumable=True)
+        ).execute()
+        print("✅ Upload Successful!")
+    except Exception as e:
+        print(f"❌ Upload Failed: {e}")
+
+# মেইন ফাংশন
+if __name__ == "__main__":
+    video = search_viral_content()
+    if video:
+        process_video(video)
+        upload_to_youtube(video['title'])
+    else:
+        print("⚠️ No video found today.")
+        
