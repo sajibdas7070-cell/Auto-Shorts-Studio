@@ -1,8 +1,8 @@
-name: Auto Shorts Studio
+name: Diamond Bot
 on:
   schedule:
-    - cron: '0 */4 * * *' # প্রতি ৪ ঘণ্টা পর পর চলবে
-  workflow_dispatch:      # ম্যানুয়ালি রান করার বাটন
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -10,15 +10,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Update & Install Tools
+      - name: Install System Tools
         run: |
-          sudo apt-get update -y
+          sudo apt-get update
           sudo apt-get install -y ffmpeg
-          python -m pip install --upgrade pip
-          pip install --upgrade yt-dlp google-generativeai google-api-python-client
+          
+      - name: Install Python Libraries
+        run: |
+          pip install --upgrade pip
+          pip install yt-dlp google-api-python-client googlesearch-python google-auth-oauthlib
 
-      - name: Run Automation
-        env:
-          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+      - name: Run Script
         run: python main.py
         
