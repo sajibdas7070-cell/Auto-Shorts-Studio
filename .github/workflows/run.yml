@@ -10,11 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Update Server & Install Tools
+      - name: Update & Install Tools
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ffmpeg
-          pip install yt-dlp google-generativeai google-api-python-client
+          python -m pip install --upgrade pip
+          pip install --upgrade yt-dlp google-generativeai google-api-python-client
 
       - name: Run Automation
         env:
